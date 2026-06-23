@@ -1,0 +1,51 @@
+<div class="grid gap-6 md:grid-cols-2">
+    {{-- Permissions --}}
+    <div class="space-y-3">
+        <flux:heading size="lg">{{ __('Permissions') }}</flux:heading>
+
+        <div class="flex flex-col divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-white/10 dark:border-white/10">
+            @forelse ($this->permissions as $permission)
+                <div class="flex items-center justify-between gap-3 p-3">
+                    <flux:text class="font-medium">{{ $permission->name }}</flux:text>
+                    <flux:button size="xs" variant="ghost" icon="trash" wire:click="deletePermission({{ $permission->id }})" wire:confirm="{{ __('Delete this permission?') }}" />
+                </div>
+            @empty
+                <flux:text class="p-3 text-zinc-500">{{ __('No permissions yet.') }}</flux:text>
+            @endforelse
+        </div>
+
+        <form wire:submit="createPermission" class="flex items-end gap-2">
+            <flux:input wire:model="permissionName" :label="__('Permission')" placeholder="manage-tags" class="flex-1" />
+            <flux:button type="submit" variant="primary">{{ __('Add') }}</flux:button>
+        </form>
+    </div>
+
+    {{-- Groups --}}
+    <div class="space-y-3">
+        <flux:heading size="lg">{{ __('Groups') }}</flux:heading>
+
+        <div class="flex flex-col divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-white/10 dark:border-white/10">
+            @forelse ($this->groups as $group)
+                <div class="flex items-start justify-between gap-3 p-3">
+                    <div class="min-w-0">
+                        <flux:heading size="sm">{{ $group->name }}</flux:heading>
+                        <flux:text size="sm" class="mt-1 text-zinc-500">{{ $group->permissions->pluck('name')->join(', ') ?: '—' }}</flux:text>
+                    </div>
+                    <flux:button size="xs" variant="ghost" icon="trash" wire:click="deleteGroup({{ $group->id }})" wire:confirm="{{ __('Delete this group?') }}" />
+                </div>
+            @empty
+                <flux:text class="p-3 text-zinc-500">{{ __('No groups yet.') }}</flux:text>
+            @endforelse
+        </div>
+
+        <form wire:submit="createGroup" class="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
+            <flux:input wire:model="groupName" :label="__('Group name')" placeholder="tags" />
+            <flux:checkbox.group wire:model="groupPermissionIds" class="grid grid-cols-2 gap-1">
+                @foreach ($this->permissions as $permission)
+                    <flux:checkbox value="{{ $permission->id }}" :label="$permission->name" />
+                @endforeach
+            </flux:checkbox.group>
+            <flux:button type="submit" variant="primary">{{ __('Add group') }}</flux:button>
+        </form>
+    </div>
+</div>

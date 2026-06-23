@@ -40,14 +40,20 @@ it('scaffolds the Livewire component with the app namespace and the plain view',
     $this->artisan('delegated-permissions:install', ['variant' => 'livewire', '--no-migrate' => true])
         ->assertSuccessful();
 
-    $component = $this->base.'/app/Livewire/DelegatedPermissions/DelegatedRoles.php';
-    $view = $this->base.'/resources/views/delegated-permissions/delegated-roles.blade.php';
+    $classDir = $this->base.'/app/Livewire/DelegatedPermissions/';
+    $viewDir = $this->base.'/resources/views/delegated-permissions/';
 
-    expect(file_exists($component))->toBeTrue()
-        ->and(file_get_contents($component))->toContain('namespace App\\Livewire\\DelegatedPermissions;')
-        ->and(file_get_contents($component))->not->toContain('{{ namespace }}')
-        ->and(file_exists($view))->toBeTrue()
-        ->and(file_get_contents($view))->not->toContain('flux:');
+    foreach (['DelegatedRoles', 'RoleAssignments', 'PermissionCatalog'] as $component) {
+        expect(file_exists($classDir.$component.'.php'))->toBeTrue()
+            ->and(file_get_contents($classDir.$component.'.php'))->toContain('namespace App\\Livewire\\DelegatedPermissions;')
+            ->and(file_get_contents($classDir.$component.'.php'))->not->toContain('{{ namespace }}');
+    }
+
+    foreach (['delegated-roles', 'role-assignments', 'permission-catalog'] as $view) {
+        expect(file_exists($viewDir.$view.'.blade.php'))->toBeTrue();
+    }
+
+    expect(file_get_contents($viewDir.'delegated-roles.blade.php'))->not->toContain('flux:');
 });
 
 it('scaffolds the Flux view variant when chosen', function () {

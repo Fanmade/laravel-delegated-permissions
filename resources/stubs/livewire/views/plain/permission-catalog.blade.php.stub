@@ -1,0 +1,60 @@
+<div class="grid gap-6 md:grid-cols-2">
+    {{-- Permissions --}}
+    <div class="space-y-3">
+        <h2 class="text-lg font-semibold">Permissions</h2>
+
+        <ul class="divide-y divide-gray-200 rounded-lg border border-gray-200">
+            @forelse ($this->permissions as $permission)
+                <li class="flex items-center justify-between gap-3 p-3 text-sm">
+                    <span class="font-medium">{{ $permission->name }}</span>
+                    <button type="button" wire:click="deletePermission({{ $permission->id }})" wire:confirm="Delete this permission?" class="text-red-600 hover:underline">
+                        Delete
+                    </button>
+                </li>
+            @empty
+                <li class="p-3 text-sm text-gray-500">No permissions yet.</li>
+            @endforelse
+        </ul>
+
+        <form wire:submit="createPermission" class="flex gap-2">
+            <input type="text" wire:model="permissionName" placeholder="manage-tags" class="w-full rounded-md border-gray-300" />
+            <button type="submit" class="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">Add</button>
+        </form>
+        @error('permissionName') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+    </div>
+
+    {{-- Groups --}}
+    <div class="space-y-3">
+        <h2 class="text-lg font-semibold">Groups</h2>
+
+        <ul class="divide-y divide-gray-200 rounded-lg border border-gray-200">
+            @forelse ($this->groups as $group)
+                <li class="flex items-start justify-between gap-3 p-3 text-sm">
+                    <div class="min-w-0">
+                        <p class="font-medium">{{ $group->name }}</p>
+                        <p class="mt-1 text-gray-500">{{ $group->permissions->pluck('name')->join(', ') ?: '—' }}</p>
+                    </div>
+                    <button type="button" wire:click="deleteGroup({{ $group->id }})" wire:confirm="Delete this group?" class="shrink-0 text-red-600 hover:underline">
+                        Delete
+                    </button>
+                </li>
+            @empty
+                <li class="p-3 text-sm text-gray-500">No groups yet.</li>
+            @endforelse
+        </ul>
+
+        <form wire:submit="createGroup" class="space-y-2 rounded-lg border border-gray-200 p-3">
+            <input type="text" wire:model="groupName" placeholder="tags" class="w-full rounded-md border-gray-300" />
+            <div class="grid grid-cols-2 gap-1">
+                @foreach ($this->permissions as $permission)
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" wire:model="groupPermissionIds" value="{{ $permission->id }}" />
+                        {{ $permission->name }}
+                    </label>
+                @endforeach
+            </div>
+            <button type="submit" class="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">Add group</button>
+            @error('groupName') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
+        </form>
+    </div>
+</div>

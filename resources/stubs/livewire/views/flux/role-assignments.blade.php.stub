@@ -1,0 +1,19 @@
+<div class="space-y-2">
+    <flux:heading size="lg">{{ __('Roles') }}</flux:heading>
+
+    <div class="flex flex-col divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-white/10 dark:border-white/10">
+        @forelse ($this->roles as $role)
+            <div class="flex items-center justify-between gap-4 p-3">
+                <flux:text class="font-medium">{{ $role->name }}</flux:text>
+                <flux:switch
+                    :label="__('Assigned')"
+                    align="left"
+                    :checked="in_array($role->id, $this->assignedRoleIds, true)"
+                    wire:click="toggleRole({{ $role->id }})"
+                />
+            </div>
+        @empty
+            <flux:text class="p-3 text-zinc-500">{{ __('No roles in this scope.') }}</flux:text>
+        @endforelse
+    </div>
+</div>

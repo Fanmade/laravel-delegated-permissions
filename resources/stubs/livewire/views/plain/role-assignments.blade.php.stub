@@ -1,0 +1,21 @@
+<div class="space-y-2">
+    <h2 class="text-lg font-semibold">Roles</h2>
+
+    <ul class="divide-y divide-gray-200 rounded-lg border border-gray-200">
+        @forelse ($this->roles as $role)
+            <li class="flex items-center justify-between gap-4 p-3">
+                <span class="font-medium">{{ $role->name }}</span>
+                <label class="flex items-center gap-2 text-sm">
+                    <input
+                        type="checkbox"
+                        wire:click="toggleRole({{ $role->id }})"
+                        @checked(in_array($role->id, $this->assignedRoleIds, true))
+                    />
+                    Assigned
+                </label>
+            </li>
+        @empty
+            <li class="p-3 text-sm text-gray-500">No roles in this scope.</li>
+        @endforelse
+    </ul>
+</div>
