@@ -6,17 +6,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Table prefix
+    |--------------------------------------------------------------------------
+    |
+    | An optional prefix prepended to every package table name below, so the
+    | package can coexist with conflicting tables in the host app (e.g. set it
+    | to "dp_" for dp_roles, dp_permissions, …).
+    |
+    */
+
+    'table_prefix' => env('DELEGATED_PERMISSIONS_TABLE_PREFIX', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Table names
     |--------------------------------------------------------------------------
     |
-    | The database tables backing the package. Fleshed out as the schema lands
-    | (see LDP-2); listed here so host apps can rename them up front.
+    | Base names for the package's tables (the prefix above is prepended).
     |
     */
 
     'tables' => [
         'permissions' => 'permissions',
         'permission_groups' => 'permission_groups',
+        'permission_group_permission' => 'permission_group_permission',
         'roles' => 'roles',
         'permission_role' => 'permission_role',
         'role_assignments' => 'role_assignments',
@@ -27,25 +40,24 @@ return [
     | System role
     |--------------------------------------------------------------------------
     |
-    | The root role of every scope's tree. It implicitly holds every permission
-    | and is the only role without a parent.
+    | The root role of every scope's tree: it implicitly holds every permission
+    | and is the only role without a parent. It is meant for initial setup and
+    | break-glass fixes — disable it (via the env toggle) once real admin roles
+    | exist, after which it grants nothing.
     |
     */
 
-    'system_role' => 'system',
+    'system' => [
+        // Master switch. When false, the system role grants nothing and its
+        // above-all access is off. Flip it off after initial setup.
+        'enabled' => env('DELEGATED_PERMISSIONS_SYSTEM_ENABLED', true),
 
-    /*
-    |--------------------------------------------------------------------------
-    | System scope above all
-    |--------------------------------------------------------------------------
-    |
-    | When true, the global "system" scope sits above every other scope, so a
-    | system role can reach any scope by default — intended as break-glass
-    | access (initial setup, critical fixes), not routine use. Set false to keep
-    | scopes fully isolated.
-    |
-    */
+        // The name of the root role.
+        'role' => 'system',
 
-    'system_scope_above_all' => true,
+        // When enabled, the system scope sits above every other scope, so a
+        // system role reaches any scope by default (break-glass).
+        'scope_above_all' => true,
+    ],
 
 ];

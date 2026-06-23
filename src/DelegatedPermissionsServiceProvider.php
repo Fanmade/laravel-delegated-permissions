@@ -11,10 +11,14 @@ final class DelegatedPermissionsServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/delegated-permissions.php', 'delegated-permissions');
+
+        $this->app->singleton(PermissionResolver::class);
     }
 
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+
         if (! $this->app->runningInConsole()) {
             return;
         }
@@ -22,5 +26,9 @@ final class DelegatedPermissionsServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/delegated-permissions.php' => $this->app->configPath('delegated-permissions.php'),
         ], 'delegated-permissions-config');
+
+        $this->publishes([
+            __DIR__.'/../database/migrations' => $this->app->databasePath('migrations'),
+        ], 'delegated-permissions-migrations');
     }
 }
