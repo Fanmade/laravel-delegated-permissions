@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Fanmade\DelegatedPermissions;
 
+use Composer\InstalledVersions;
+
 final class DelegatedPermissions
 {
-    public const string VERSION = '0.0.1-dev';
-
+    /**
+     * The installed package version, read from Composer's runtime so it always
+     * matches the released tag.
+     */
     public static function version(): string
     {
-        return self::VERSION;
+        return InstalledVersions::getPrettyVersion('fanmade/laravel-delegated-permissions') ?? 'dev';
     }
 
     /**

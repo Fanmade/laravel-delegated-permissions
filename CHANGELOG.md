@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-06-23
+
+### Changed
+
+- `DelegatedPermissions::version()` now reads the installed version from
+  Composer's runtime (`Composer\InstalledVersions`) instead of a hardcoded
+  constant that drifted from the released tag. The `VERSION` constant is removed.
+
 ## [0.1.0] - 2026-06-23
 
 ### Added
