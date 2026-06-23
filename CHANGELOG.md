@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-23
+
 ### Added
 
 - Constrained-delegation engine (`PermissionResolver`): the `system` role holds
@@ -22,4 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RoleManager` and `PermissionManager` for runtime role / permission / group
   management, plus the `ManagementPermission` enum.
 - Configurable table prefix (`DELEGATED_PERMISSIONS_TABLE_PREFIX`).
+- `php artisan ldp:install` command (variant selection, config publish, migrate,
+  and seeding of the management permissions + a system role).
+- Publishable Livewire UI boilerplate — role-tree manager, role-assignment panel,
+  and permission/group catalog — in plain-Tailwind and Flux variants.
 - Test suite covering SQLite and PostgreSQL.
+
+[0.1.0]: https://github.com/Fanmade/laravel-delegated-permissions/releases/tag/v0.1.0
