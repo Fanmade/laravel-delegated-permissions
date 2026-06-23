@@ -8,7 +8,9 @@ use Fanmade\DelegatedPermissions\Exceptions\OrphanRole;
 use Fanmade\DelegatedPermissions\Exceptions\OutOfBoundsGrant;
 use Fanmade\DelegatedPermissions\Exceptions\SystemRoleException;
 use Fanmade\DelegatedPermissions\Exceptions\UnknownPermission;
+use Fanmade\DelegatedPermissions\Exceptions\UnknownPermissionGroup;
 use Fanmade\DelegatedPermissions\Models\Permission;
+use Fanmade\DelegatedPermissions\Models\PermissionGroup;
 use Fanmade\DelegatedPermissions\Models\Role;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
@@ -101,6 +103,60 @@ final class PermissionResolver
         DB::table(DelegatedPermissions::table('permission_role'))
             ->whereIn('role_id', $roleIds)
             ->where('permission_id', $permission->getKey())
+            ->delete();
+
+        $this->flush();
+    }
+
+    /**
+     * Grant every permission in a group to a role. All-or-nothing: the role's
+     * parent must effectively hold every permission in the group, otherwise the
+     * whole grant is rejected and nothing changes.
+     */
+    public function grantGroup(Role $role, PermissionGroup|string $group): void
+    {
+        if ($role->is_system) {
+            throw SystemRoleException::implicitlyHoldsEverything();
+        }
+
+        $group = $this->resolveGroup($group);
+        $parent = $role->parent;
+
+        if ($parent === null) {
+            throw OrphanRole::cannotDelegate($role);
+        }
+
+        $permissions = $group->permissions()->get();
+        $parentPermissions = $this->permissionsFor($parent);
+
+        $missing = $permissions->reject(static fn (Permission $permission): bool => $parentPermissions->contains($permission->name));
+
+        if ($missing->isNotEmpty()) {
+            throw OutOfBoundsGrant::groupExceedsParent($role, $group, $missing->pluck('name')->all());
+        }
+
+        $role->permissions()->syncWithoutDetaching($permissions->pluck('id')->all());
+
+        $this->flush();
+    }
+
+    /**
+     * Revoke every permission in a group from a role and its descendants.
+     */
+    public function revokeGroup(Role $role, PermissionGroup|string $group): void
+    {
+        if ($role->is_system) {
+            throw SystemRoleException::implicitlyHoldsEverything();
+        }
+
+        $group = $this->resolveGroup($group);
+
+        $permissionIds = $group->permissions()->pluck(DelegatedPermissions::table('permissions').'.id')->all();
+        $roleIds = array_merge([(int) $role->getKey()], $this->descendantIds($role));
+
+        DB::table(DelegatedPermissions::table('permission_role'))
+            ->whereIn('role_id', $roleIds)
+            ->whereIn('permission_id', $permissionIds)
             ->delete();
 
         $this->flush();
@@ -251,6 +307,21 @@ final class PermissionResolver
 
         if ($model === null) {
             throw UnknownPermission::named($permission);
+        }
+
+        return $model;
+    }
+
+    private function resolveGroup(PermissionGroup|string $group): PermissionGroup
+    {
+        if ($group instanceof PermissionGroup) {
+            return $group;
+        }
+
+        $model = PermissionGroup::query()->where('name', $group)->first();
+
+        if ($model === null) {
+            throw UnknownPermissionGroup::named($group);
         }
 
         return $model;
