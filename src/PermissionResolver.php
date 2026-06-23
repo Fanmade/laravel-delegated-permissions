@@ -10,6 +10,8 @@ use Fanmade\DelegatedPermissions\Exceptions\SystemRoleException;
 use Fanmade\DelegatedPermissions\Exceptions\UnknownPermission;
 use Fanmade\DelegatedPermissions\Models\Permission;
 use Fanmade\DelegatedPermissions\Models\Role;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -91,6 +93,103 @@ final class PermissionResolver
             ->whereIn('role_id', $roleIds)
             ->where('permission_id', $permission->getKey())
             ->delete();
+    }
+
+    /**
+     * Assign a role to an authorizable (idempotent).
+     */
+    public function assign(Model $authorizable, Role $role): void
+    {
+        DB::table(DelegatedPermissions::table('role_assignments'))->insertOrIgnore([
+            'role_id' => $role->getKey(),
+            'authorizable_type' => $authorizable->getMorphClass(),
+            'authorizable_id' => $authorizable->getKey(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Remove a role assignment from an authorizable.
+     */
+    public function unassign(Model $authorizable, Role $role): void
+    {
+        DB::table(DelegatedPermissions::table('role_assignments'))
+            ->where('role_id', $role->getKey())
+            ->where('authorizable_type', $authorizable->getMorphClass())
+            ->where('authorizable_id', $authorizable->getKey())
+            ->delete();
+    }
+
+    /**
+     * The roles assigned to an authorizable.
+     *
+     * @return EloquentCollection<int, Role>
+     */
+    public function assignedRoles(Model $authorizable): EloquentCollection
+    {
+        $roleIds = DB::table(DelegatedPermissions::table('role_assignments'))
+            ->where('authorizable_type', $authorizable->getMorphClass())
+            ->where('authorizable_id', $authorizable->getKey())
+            ->pluck('role_id');
+
+        return Role::query()->whereIn('id', $roleIds)->get();
+    }
+
+    /**
+     * Every permission the authorizable effectively holds within the given scope
+     * (null = the global scope). When the system scope sits above all, holding
+     * the system role grants its permissions in every scope.
+     *
+     * @return Collection<int, string>
+     */
+    public function permissionsForAuthorizable(Model $authorizable, ?Model $scope = null): Collection
+    {
+        $roles = $this->assignedRoles($authorizable);
+
+        $permissions = $roles
+            ->filter(fn (Role $role): bool => $this->roleMatchesScope($role, $scope))
+            ->flatMap(fn (Role $role): Collection => $this->permissionsFor($role));
+
+        if ($scope !== null && $this->systemAboveAllActive()) {
+            $fromSystem = $roles
+                ->filter(static fn (Role $role): bool => $role->is_system)
+                ->flatMap(fn (Role $role): Collection => $this->permissionsFor($role));
+
+            $permissions = $permissions->merge($fromSystem);
+        }
+
+        return $permissions->unique()->values();
+    }
+
+    /**
+     * Whether the authorizable effectively holds the permission within the scope.
+     */
+    public function authorizableHas(Model $authorizable, string $permission, ?Model $scope = null): bool
+    {
+        return $this->permissionsForAuthorizable($authorizable, $scope)->contains($permission);
+    }
+
+    /**
+     * Whether a role belongs to the given scope (null = the global scope).
+     */
+    private function roleMatchesScope(Role $role, ?Model $scope): bool
+    {
+        if ($scope === null) {
+            return $role->scope_type === null && $role->scope_id === null;
+        }
+
+        return $role->scope_type === $scope->getMorphClass()
+            && (int) $role->scope_id === (int) $scope->getKey();
+    }
+
+    /**
+     * Whether the system role currently reaches every scope.
+     */
+    private function systemAboveAllActive(): bool
+    {
+        return DelegatedPermissions::systemEnabled()
+            && (bool) config('delegated-permissions.system.scope_above_all', true);
     }
 
     /**
