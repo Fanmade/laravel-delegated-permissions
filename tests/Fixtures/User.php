@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fanmade\DelegatedPermissions\Tests\Fixtures;
 
+use Fanmade\DelegatedPermissions\Concerns\HasRoles;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -14,5 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class User extends Model
 {
+    use HasRoles;
+
     protected $guarded = [];
 }
