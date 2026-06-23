@@ -27,6 +27,10 @@ final class DelegatedPermissionsServiceProvider extends ServiceProvider
             return;
         }
 
+        $this->commands([
+            Console\InstallCommand::class,
+        ]);
+
         $this->publishes([
             __DIR__.'/../config/delegated-permissions.php' => $this->app->configPath('delegated-permissions.php'),
         ], 'delegated-permissions-config');
