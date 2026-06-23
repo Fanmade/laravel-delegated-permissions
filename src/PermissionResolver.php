@@ -283,6 +283,8 @@ final class PermissionResolver
     /**
      * The ids of every role beneath the given one, at any depth.
      *
+     * @todo: Refactor this to not use an array_merge withing a loop
+     *
      * @return array<int, int>
      */
     private function descendantIds(Role $role): array
