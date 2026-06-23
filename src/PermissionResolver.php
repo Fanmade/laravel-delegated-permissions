@@ -28,6 +28,13 @@ use Illuminate\Support\Facades\DB;
 final class PermissionResolver
 {
     /**
+     * Per-request memoised authorizable resolutions, keyed by authorizable+scope.
+     *
+     * @var array<string, Collection<int, string>>
+     */
+    private array $resolved = [];
+
+    /**
      * The names of every permission the role effectively holds.
      *
      * @return Collection<int, string>
@@ -73,6 +80,8 @@ final class PermissionResolver
         }
 
         $role->permissions()->syncWithoutDetaching([$permission->getKey()]);
+
+        $this->flush();
     }
 
     /**
@@ -93,6 +102,8 @@ final class PermissionResolver
             ->whereIn('role_id', $roleIds)
             ->where('permission_id', $permission->getKey())
             ->delete();
+
+        $this->flush();
     }
 
     /**
@@ -107,6 +118,8 @@ final class PermissionResolver
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->flush();
     }
 
     /**
@@ -119,6 +132,8 @@ final class PermissionResolver
             ->where('authorizable_type', $authorizable->getMorphClass())
             ->where('authorizable_id', $authorizable->getKey())
             ->delete();
+
+        $this->flush();
     }
 
     /**
@@ -138,12 +153,37 @@ final class PermissionResolver
 
     /**
      * Every permission the authorizable effectively holds within the given scope
-     * (null = the global scope). When the system scope sits above all, holding
-     * the system role grants its permissions in every scope.
+     * (null = the global scope). Memoised for the request.
      *
      * @return Collection<int, string>
      */
     public function permissionsForAuthorizable(Model $authorizable, ?Model $scope = null): Collection
+    {
+        return $this->resolved[$this->cacheKey($authorizable, $scope)] ??= $this->resolvePermissions($authorizable, $scope);
+    }
+
+    /**
+     * Whether the authorizable effectively holds the permission within the scope.
+     */
+    public function authorizableHas(Model $authorizable, string $permission, ?Model $scope = null): bool
+    {
+        return $this->permissionsForAuthorizable($authorizable, $scope)->contains($permission);
+    }
+
+    /**
+     * Drop the memoised authorizable resolutions (called after any change).
+     */
+    public function flush(): void
+    {
+        $this->resolved = [];
+    }
+
+    /**
+     * Compute (uncached) the permissions an authorizable holds within a scope.
+     *
+     * @return Collection<int, string>
+     */
+    private function resolvePermissions(Model $authorizable, ?Model $scope): Collection
     {
         $roles = $this->assignedRoles($authorizable);
 
@@ -160,14 +200,6 @@ final class PermissionResolver
         }
 
         return $permissions->unique()->values();
-    }
-
-    /**
-     * Whether the authorizable effectively holds the permission within the scope.
-     */
-    public function authorizableHas(Model $authorizable, string $permission, ?Model $scope = null): bool
-    {
-        return $this->permissionsForAuthorizable($authorizable, $scope)->contains($permission);
     }
 
     /**
@@ -222,5 +254,19 @@ final class PermissionResolver
         }
 
         return $model;
+    }
+
+    /**
+     * A stable key for memoising a resolution; includes the system flags so a
+     * config change cannot return a stale set.
+     */
+    private function cacheKey(Model $authorizable, ?Model $scope): string
+    {
+        $who = $authorizable->getMorphClass().'#'.$authorizable->getKey();
+        $where = $scope === null ? 'global' : $scope->getMorphClass().'#'.$scope->getKey();
+        $flags = (DelegatedPermissions::systemEnabled() ? 'E' : 'e')
+            .(config('delegated-permissions.system.scope_above_all') ? 'A' : 'a');
+
+        return $who.'|'.$where.'|'.$flags;
     }
 }

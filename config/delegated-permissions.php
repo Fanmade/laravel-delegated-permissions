@@ -19,6 +19,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Gate integration
+    |--------------------------------------------------------------------------
+    |
+    | When true, a Gate "before" hook lets permission checks flow through the
+    | resolver, so `$user->can('manage-tags', $project)` works out of the box
+    | (the first model argument is taken as the scope). Disable it to keep gate
+    | checks untouched and call `hasPermission()` directly instead.
+    |
+    */
+
+    'register_gate' => env('DELEGATED_PERMISSIONS_REGISTER_GATE', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Table names
     |--------------------------------------------------------------------------
     |

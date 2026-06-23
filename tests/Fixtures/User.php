@@ -6,6 +6,7 @@ namespace Fanmade\DelegatedPermissions\Tests\Fixtures;
 
 use Fanmade\DelegatedPermissions\Concerns\HasRoles;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\Access\Authorizable;
 
 /**
  * A minimal authorizable for the test suite.
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class User extends Model
 {
+    use Authorizable;
     use HasRoles;
 
     protected $guarded = [];
