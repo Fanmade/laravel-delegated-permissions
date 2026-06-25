@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-06-25
+
+### Changed
+
+- `PermissionResolver` now memoises an authorizable's assigned roles per request,
+  keyed by the authorizable alone. A role set does not vary by scope, so resolving
+  the same authorizable across several scopes in one request no longer reloads it
+  once per scope — it is loaded a single time and shared. `flush()` clears this
+  cache alongside the existing per-scope resolution cache, so an assignment change
+  is never served stale.
+
 ## [0.1.1] - 2026-06-23
 
 ### Changed
@@ -38,4 +49,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and permission/group catalog — in plain-Tailwind and Flux variants.
 - Test suite covering SQLite and PostgreSQL.
 
+[0.1.2]: https://github.com/Fanmade/laravel-delegated-permissions/releases/tag/v0.1.2
 [0.1.0]: https://github.com/Fanmade/laravel-delegated-permissions/releases/tag/v0.1.0
