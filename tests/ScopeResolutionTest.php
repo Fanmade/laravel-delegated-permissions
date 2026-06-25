@@ -8,6 +8,7 @@ use Fanmade\DelegatedPermissions\PermissionResolver;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\Project;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -84,6 +85,37 @@ it('grants nothing anywhere when the system role is disabled', function () {
 
     expect($this->resolver->permissionsForAuthorizable($this->user, $this->projectA))->toBeEmpty()
         ->and($this->resolver->permissionsForAuthorizable($this->user, null))->toBeEmpty();
+});
+
+it('loads a user\'s assigned roles once per request across multiple scopes', function () {
+    $this->resolver->assign($this->user, $this->ownerA);
+
+    DB::enableQueryLog();
+
+    // Resolve the same user against three distinct scopes in one request.
+    $this->resolver->permissionsForAuthorizable($this->user, $this->projectA);
+    $this->resolver->permissionsForAuthorizable($this->user, $this->projectB);
+    $this->resolver->permissionsForAuthorizable($this->user, null);
+
+    $roleLoads = collect(DB::getQueryLog())
+        ->filter(static fn (array $query): bool => str_contains($query['query'], 'role_assignments'))
+        ->count();
+    DB::disableQueryLog();
+
+    // The role set does not vary by scope, so it is loaded a single time.
+    expect($roleLoads)->toBe(1);
+});
+
+it('reloads assigned roles after an assignment change flushes the cache', function () {
+    $this->resolver->assign($this->user, $this->memberA);
+    expect($this->resolver->assignedRoles($this->user)->count())->toBe(1);
+
+    // A further assignment must invalidate the memoised role set, not serve it stale.
+    $this->resolver->assign($this->user, $this->ownerA);
+    expect($this->resolver->assignedRoles($this->user)->count())->toBe(2);
+
+    $this->resolver->unassign($this->user, $this->ownerA);
+    expect($this->resolver->assignedRoles($this->user)->count())->toBe(1);
 });
 
 it('assigns and unassigns roles idempotently', function () {

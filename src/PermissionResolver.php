@@ -37,6 +37,16 @@ final class PermissionResolver
     private array $resolved = [];
 
     /**
+     * Per-request memoised role assignments, keyed by authorizable alone. An
+     * authorizable's role set does not vary by scope, so it is loaded once and
+     * shared across every scope resolved in the request (scope filtering happens
+     * in PHP afterwards). Cleared by {@see flush()} on any assignment change.
+     *
+     * @var array<string, EloquentCollection<int, Role>>
+     */
+    private array $rolesByAuthorizable = [];
+
+    /**
      * The names of every permission the role effectively holds.
      *
      * @return Collection<int, string>
@@ -199,6 +209,16 @@ final class PermissionResolver
      */
     public function assignedRoles(Model $authorizable): EloquentCollection
     {
+        return $this->rolesByAuthorizable[$this->authorizableKey($authorizable)] ??= $this->loadAssignedRoles($authorizable);
+    }
+
+    /**
+     * Load (uncached) the roles assigned to an authorizable.
+     *
+     * @return EloquentCollection<int, Role>
+     */
+    private function loadAssignedRoles(Model $authorizable): EloquentCollection
+    {
         $roleIds = DB::table(DelegatedPermissions::table('role_assignments'))
             ->where('authorizable_type', $authorizable->getMorphClass())
             ->where('authorizable_id', $authorizable->getKey())
@@ -232,6 +252,7 @@ final class PermissionResolver
     public function flush(): void
     {
         $this->resolved = [];
+        $this->rolesByAuthorizable = [];
     }
 
     /**
@@ -335,11 +356,19 @@ final class PermissionResolver
      */
     private function cacheKey(Model $authorizable, ?Model $scope): string
     {
-        $who = $authorizable->getMorphClass().'#'.$authorizable->getKey();
+        $who = $this->authorizableKey($authorizable);
         $where = $scope === null ? 'global' : $scope->getMorphClass().'#'.$scope->getKey();
         $flags = (DelegatedPermissions::systemEnabled() ? 'E' : 'e')
             .(config('delegated-permissions.system.scope_above_all') ? 'A' : 'a');
 
         return $who.'|'.$where.'|'.$flags;
+    }
+
+    /**
+     * A stable key identifying an authorizable, independent of scope.
+     */
+    private function authorizableKey(Model $authorizable): string
+    {
+        return $authorizable->getMorphClass().'#'.$authorizable->getKey();
     }
 }
