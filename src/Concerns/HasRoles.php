@@ -7,6 +7,7 @@ namespace Fanmade\DelegatedPermissions\Concerns;
 use Fanmade\DelegatedPermissions\DelegatedPermissions;
 use Fanmade\DelegatedPermissions\Models\Role;
 use Fanmade\DelegatedPermissions\PermissionResolver;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
@@ -96,6 +97,17 @@ trait HasRoles
                     && (int) $role->scope_id === (int) $scope->getKey();
             })
             ->values();
+    }
+
+    /**
+     * The roles this model may see and manage within a scope: the roles it holds
+     * and all of their descendants, never an ancestor and never a system role.
+     *
+     * @return EloquentCollection<int, Role>
+     */
+    public function visibleRoles(?Model $scope = null): EloquentCollection
+    {
+        return $this->resolver()->visibleRoles($this, $scope);
     }
 
     protected function resolver(): PermissionResolver

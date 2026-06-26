@@ -228,6 +228,69 @@ final class PermissionResolver
     }
 
     /**
+     * The roles an authorizable may see within a scope: the role(s) it holds and
+     * all of their descendants — never an ancestor, and never a system role. A
+     * holder of a scope-spanning system role sees every non-system role in the
+     * scope. This is the visibility/management set: a user never learns of roles
+     * above their own, and the system root is hidden from everyone.
+     *
+     * @return Collection<int, Role>
+     */
+    public function visibleRoles(Model $authorizable, ?Model $scope = null): Collection
+    {
+        $scoped = $this->scopedNonSystemRoles($scope);
+        $assigned = $this->assignedRoles($authorizable);
+
+        // A system-role holder is above every scope (when enabled), so they see
+        // every non-system role in the scope.
+        if ($this->systemAboveAllActive() && $assigned->contains(static fn (Role $role): bool => $role->is_system)) {
+            return $scoped;
+        }
+
+        $childrenByParent = $scoped->groupBy('parent_id');
+
+        $visible = [];
+        $queue = $assigned
+            ->filter(fn (Role $role): bool => $this->roleMatchesScope($role, $scope))
+            ->reject(static fn (Role $role): bool => $role->is_system)
+            ->all();
+
+        while ($queue !== []) {
+            $role = array_pop($queue);
+
+            if (isset($visible[$role->getKey()])) {
+                continue;
+            }
+
+            $visible[$role->getKey()] = true;
+
+            foreach ($childrenByParent->get($role->getKey(), new EloquentCollection) as $child) {
+                $queue[] = $child;
+            }
+        }
+
+        return $scoped->filter(static fn (Role $role): bool => isset($visible[$role->getKey()]))->values();
+    }
+
+    /**
+     * Every non-system role in the given scope (null = the global scope).
+     *
+     * @return EloquentCollection<int, Role>
+     */
+    private function scopedNonSystemRoles(?Model $scope): EloquentCollection
+    {
+        $query = Role::query()->where('is_system', false);
+
+        if ($scope === null) {
+            $query->whereNull('scope_type')->whereNull('scope_id');
+        } else {
+            $query->where('scope_type', $scope->getMorphClass())->where('scope_id', $scope->getKey());
+        }
+
+        return $query->get();
+    }
+
+    /**
      * Every permission the authorizable effectively holds within the given scope
      * (null = the global scope). Memoised for the request.
      *
