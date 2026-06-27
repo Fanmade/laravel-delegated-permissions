@@ -35,4 +35,19 @@ final class DelegatedPermissions
     {
         return (bool) config('delegated-permissions.system.enabled', true);
     }
+
+    /**
+     * The cap on how many roles an authorizable may hold within one scope, or
+     * null for unlimited. Both null and a negative value mean unlimited.
+     */
+    public static function maxRolesPerScope(): ?int
+    {
+        $limit = config('delegated-permissions.max_roles_per_scope');
+
+        if ($limit === null || (int) $limit < 0) {
+            return null;
+        }
+
+        return (int) $limit;
+    }
 }

@@ -6,6 +6,7 @@ namespace Fanmade\DelegatedPermissions;
 
 use Fanmade\DelegatedPermissions\Exceptions\OrphanRole;
 use Fanmade\DelegatedPermissions\Exceptions\OutOfBoundsGrant;
+use Fanmade\DelegatedPermissions\Exceptions\RoleLimitExceeded;
 use Fanmade\DelegatedPermissions\Exceptions\SystemRoleException;
 use Fanmade\DelegatedPermissions\Exceptions\UnknownPermission;
 use Fanmade\DelegatedPermissions\Exceptions\UnknownPermissionGroup;
@@ -173,10 +174,14 @@ final class PermissionResolver
     }
 
     /**
-     * Assign a role to an authorizable (idempotent).
+     * Assign a role to an authorizable (idempotent). Throws RoleLimitExceeded
+     * when the assignment would push the authorizable past the configured
+     * max_roles_per_scope cap for the role's scope.
      */
     public function assign(Model $authorizable, Role $role): void
     {
+        $this->guardRoleLimit($authorizable, $role);
+
         DB::table(DelegatedPermissions::table('role_assignments'))->insertOrIgnore([
             'role_id' => $role->getKey(),
             'authorizable_type' => $authorizable->getMorphClass(),
@@ -200,6 +205,42 @@ final class PermissionResolver
             ->delete();
 
         $this->flush();
+    }
+
+    /**
+     * Reject an assignment that would exceed the per-scope role cap. The system
+     * role is exempt — it is neither counted nor blocked — and re-assigning a
+     * role already held is idempotent, so it never trips the cap.
+     */
+    private function guardRoleLimit(Model $authorizable, Role $role): void
+    {
+        $limit = DelegatedPermissions::maxRolesPerScope();
+
+        if ($limit === null || $role->is_system) {
+            return;
+        }
+
+        $inScope = $this->assignedRoles($authorizable)
+            ->reject(static fn (Role $held): bool => (bool) $held->is_system)
+            ->filter(fn (Role $held): bool => $this->sameScope($held, $role));
+
+        if ($inScope->contains(static fn (Role $held): bool => $held->getKey() === $role->getKey())) {
+            return;
+        }
+
+        if ($inScope->count() >= $limit) {
+            throw RoleLimitExceeded::forScope($authorizable, $role, $limit);
+        }
+    }
+
+    /**
+     * Whether two roles live in the same scope (same scope type and id, treating
+     * the global scope — both null — as a scope of its own).
+     */
+    private function sameScope(Role $a, Role $b): bool
+    {
+        return $a->scope_type === $b->scope_type
+            && (string) $a->scope_id === (string) $b->scope_id;
     }
 
     /**
@@ -371,13 +412,12 @@ final class PermissionResolver
      *
      * @return array<int, int>
      */
-    private function descendantIds(Role $role): array
+    private function descendantIds(Role $role, array $ids = []): array
     {
-        $ids = [];
-
         foreach ($role->children()->get() as $child) {
-            $ids[] = (int) $child->getKey();
-            $ids = array_merge($ids, $this->descendantIds($child));
+            $key = (int)$child->getKey();
+            $ids[$key] = $key;
+            $ids = $this->descendantIds($child, $ids);
         }
 
         return $ids;

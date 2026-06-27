@@ -121,6 +121,25 @@ $user->hasPermission('manage-tags', $projectB); // false
 $user->permissionsIn(null);                     // global-scope permissions only
 ```
 
+## Roles per scope
+
+A model may hold several roles within one scope; effective permissions are the
+**union** across them. The `max_roles_per_scope` config caps how many — `1` for
+the classic single-role model, `n` for up to n, `null`/`-1` (the default) for
+unlimited:
+
+```php
+// config/delegated-permissions.php → 'max_roles_per_scope' => 1
+$user->assignRole($designer);             // ok — first role in the scope
+$user->assignRole($reviewer);             // throws RoleLimitExceeded
+```
+
+The cap is counted per scope, so a role in another project is unaffected.
+Re-assigning a role the model already holds is idempotent and never trips the
+cap, and the break-glass system role is exempt — it is neither counted nor
+blocked. Catch `RoleLimitExceeded` if you want to evict-then-assign instead of
+rejecting.
+
 ## The system role (break-glass)
 
 The `system` role implicitly holds everything and, with `scope_above_all` on,

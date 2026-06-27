@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Configurable `max_roles_per_scope` cap on how many roles a single authorizable
+  may hold within one scope (`1` = single role, `n` = up to n, `null`/`-1` =
+  unlimited — the default). Assigning beyond the cap throws the new
+  `RoleLimitExceeded` exception; effective permissions remain the union across
+  every role held in the scope. The break-glass system role is exempt — never
+  counted against the cap and never blocked by it — and re-assigning a role
+  already held stays idempotent. Enforced in `PermissionResolver::assign()`, so
+  it covers the `HasRoles::assignRole()` path too.
+
 ## [0.1.2] - 2026-06-25
 
 ### Changed

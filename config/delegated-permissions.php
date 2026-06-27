@@ -74,4 +74,24 @@ return [
         'scope_above_all' => true,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Roles per scope
+    |--------------------------------------------------------------------------
+    |
+    | How many roles a single authorizable may hold within one scope. Assigning
+    | a role beyond this cap throws RoleLimitExceeded; effective permissions are
+    | always the union across every role held in the scope.
+    |
+    |   1          one role per scope (the classic single-role model)
+    |   n          up to n roles per scope
+    |   null / -1  unlimited
+    |
+    | The break-glass system role is exempt — it is never counted against the
+    | cap and is never blocked by it.
+    |
+    */
+
+    'max_roles_per_scope' => env('DELEGATED_PERMISSIONS_MAX_ROLES_PER_SCOPE'),
+
 ];
