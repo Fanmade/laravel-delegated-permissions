@@ -415,7 +415,7 @@ final class PermissionResolver
     private function descendantIds(Role $role, array $ids = []): array
     {
         foreach ($role->children()->get() as $child) {
-            $key = (int)$child->getKey();
+            $key = (int) $child->getKey();
             $ids[$key] = $key;
             $ids = $this->descendantIds($child, $ids);
         }
