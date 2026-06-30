@@ -27,6 +27,12 @@ use Illuminate\Support\Facades\DB;
  *  - a role may only hold permissions its parent holds;
  *  - revoking a permission cascades down to every descendant;
  *  - granting a permission never cascades to descendants.
+ *
+ * Despite the "resolver" name, the constrained mutations
+ * ({@see grant()}, {@see revoke()}, {@see grantGroup()}, {@see revokeGroup()},
+ * {@see assign()}, {@see unassign()}) live here too, by design: each one must
+ * enforce the same invariants this class computes, so reads and bounded writes
+ * share one engine rather than drifting across two classes.
  */
 final class PermissionResolver
 {
@@ -300,9 +306,9 @@ final class PermissionResolver
      * scope. This is the visibility/management set: a user never learns of roles
      * above their own, and the system root is hidden from everyone.
      *
-     * @return Collection<int, Role>
+     * @return EloquentCollection<int, Role>
      */
-    public function visibleRoles(Model $authorizable, ?Model $scope = null): Collection
+    public function visibleRoles(Model $authorizable, ?Model $scope = null): EloquentCollection
     {
         $scoped = $this->scopedNonSystemRoles($scope);
         $assigned = $this->assignedRoles($authorizable);

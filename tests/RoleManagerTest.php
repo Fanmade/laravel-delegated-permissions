@@ -59,6 +59,27 @@ it('renames a role', function () {
     expect($owner->fresh()->name)->toBe('lead');
 });
 
+it('ignores attributes outside the editable set', function () {
+    $owner = $this->manager->createRole('owner', $this->system, [], $this->project);
+    $member = $this->manager->createRole('member', $owner, [], $this->project);
+
+    // Only name/description are editable — structural attributes are dropped, so
+    // updateRole can never re-parent, re-scope or promote a role to system.
+    $this->manager->updateRole($member, [
+        'name' => 'lead',
+        'parent_id' => $this->system->id,
+        'is_system' => true,
+        'scope_id' => 999,
+    ]);
+
+    $fresh = $member->fresh();
+
+    expect($fresh->name)->toBe('lead')
+        ->and($fresh->parent_id)->toBe($owner->id)
+        ->and($fresh->is_system)->toBeFalse()
+        ->and((int) $fresh->scope_id)->toBe($this->project->id);
+});
+
 it('re-parents children onto the grandparent when a role is deleted', function () {
     $owner = $this->manager->createRole('owner', $this->system, ['manage-tags'], $this->project);
     $member = $this->manager->createRole('member', $owner, ['manage-tags']);

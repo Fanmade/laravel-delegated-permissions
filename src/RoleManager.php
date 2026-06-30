@@ -58,13 +58,24 @@ final class RoleManager
     }
 
     /**
-     * Rename or re-describe a role.
+     * A role's user-editable attributes. Its structural attributes — parent,
+     * scope and permission set — are intentionally not editable here; those are
+     * managed through {@see createRole()}/{@see deleteRole()} and the resolver's
+     * grant/revoke methods, which enforce the delegation invariants.
+     *
+     * @var list<string>
+     */
+    private const array EDITABLE_ATTRIBUTES = ['name', 'description'];
+
+    /**
+     * Rename or re-describe a role. Any attribute outside
+     * {@see self::EDITABLE_ATTRIBUTES} is deliberately ignored.
      *
      * @param  array<string, mixed>  $attributes
      */
     public function updateRole(Role $role, array $attributes): Role
     {
-        $role->update(collect($attributes)->only(['name', 'description'])->all());
+        $role->update(collect($attributes)->only(self::EDITABLE_ATTRIBUTES)->all());
 
         return $role;
     }
