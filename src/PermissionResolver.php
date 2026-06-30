@@ -406,20 +406,25 @@ final class PermissionResolver
     }
 
     /**
-     * The ids of every role beneath the given one, at any depth.
+     * The ids of every role beneath the given one, at any depth, resolved in a
+     * single recursive CTE rather than one query per node.
      *
-     * @param  array<int, int>  $ids
-     * @return array<int, int>
+     * @return list<int>
      */
-    private function descendantIds(Role $role, array $ids = []): array
+    private function descendantIds(Role $role): array
     {
-        foreach ($role->children()->get() as $child) {
-            $key = (int) $child->getKey();
-            $ids[$key] = $key;
-            $ids = $this->descendantIds($child, $ids);
-        }
+        $roles = DelegatedPermissions::table('roles');
 
-        return $ids;
+        $rows = DB::select(
+            'with recursive descendants as ('
+            ."select id from {$roles} where parent_id = ? "
+            .'union all '
+            ."select r.id from {$roles} r inner join descendants d on r.parent_id = d.id"
+            .') select id from descendants',
+            [$role->getKey()],
+        );
+
+        return array_map(static fn (object $row): int => (int) $row->id, $rows);
     }
 
     private function resolve(Permission|string $permission): Permission

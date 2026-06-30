@@ -10,6 +10,7 @@ use Fanmade\DelegatedPermissions\Models\Permission;
 use Fanmade\DelegatedPermissions\Models\Role;
 use Fanmade\DelegatedPermissions\PermissionResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -97,6 +98,35 @@ it('only revokes from the subtree, leaving siblings untouched', function () {
 
     expect($this->resolver->roleHas($this->admin, 'a'))->toBeFalse()
         ->and($this->resolver->roleHas($sibling, 'a'))->toBeTrue();
+});
+
+it('cascades a revoke in a flat number of queries regardless of tree depth', function () {
+    // Each call builds an independent chain of the given depth under the system
+    // role, grants 'a' down it, then counts the queries the revoke cascade issues.
+    $revokeQueries = function (int $depth): int {
+        $root = Role::create(['name' => "root-{$depth}", 'parent_id' => $this->system->id]);
+        $this->resolver->grant($root, 'a');
+
+        $parent = $root;
+        for ($i = 0; $i < $depth; $i++) {
+            $child = Role::create(['name' => "n-{$depth}-{$i}", 'parent_id' => $parent->id]);
+            $this->resolver->grant($child, 'a');
+            $parent = $child;
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->resolver->revoke($root, 'a');
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    // The subtree loads in one recursive CTE, so a deep chain costs no more
+    // queries than a shallow one — with the old per-node walk, depth 10 issued
+    // ~8 more SELECTs than depth 2.
+    expect($revokeQueries(10))->toBe($revokeQueries(2));
 });
 
 it('refuses to grant or revoke on the system role', function () {
