@@ -177,20 +177,42 @@ final class PermissionResolver
      * Assign a role to an authorizable (idempotent). Throws RoleLimitExceeded
      * when the assignment would push the authorizable past the configured
      * max_roles_per_scope cap for the role's scope.
+     *
+     * The cap check and the insert run in one transaction behind a row lock on
+     * the authorizable, so two concurrent assigns for the same authorizable
+     * cannot both pass the check and exceed the cap. On engines without row
+     * locks (e.g. SQLite) the surrounding transaction still serialises writes.
      */
     public function assign(Model $authorizable, Role $role): void
     {
-        $this->guardRoleLimit($authorizable, $role);
+        DB::transaction(function () use ($authorizable, $role): void {
+            $this->lockAuthorizable($authorizable);
+            $this->guardRoleLimit($authorizable, $role);
 
-        DB::table(DelegatedPermissions::table('role_assignments'))->insertOrIgnore([
-            'role_id' => $role->getKey(),
-            'authorizable_type' => $authorizable->getMorphClass(),
-            'authorizable_id' => $authorizable->getKey(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+            DB::table(DelegatedPermissions::table('role_assignments'))->insertOrIgnore([
+                'role_id' => $role->getKey(),
+                'authorizable_type' => $authorizable->getMorphClass(),
+                'authorizable_id' => $authorizable->getKey(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
 
         $this->flush();
+    }
+
+    /**
+     * Take a row lock on the authorizable for the rest of the current
+     * transaction, serialising concurrent assigns for the same authorizable so
+     * the cap check and the insert are atomic. A no-op on lock-free engines,
+     * where the enclosing transaction provides the ordering instead.
+     */
+    private function lockAuthorizable(Model $authorizable): void
+    {
+        $authorizable->newQuery()
+            ->whereKey($authorizable->getKey())
+            ->lockForUpdate()
+            ->first();
     }
 
     /**
@@ -211,6 +233,9 @@ final class PermissionResolver
      * Reject an assignment that would exceed the per-scope role cap. The system
      * role is exempt — it is neither counted nor blocked — and re-assigning a
      * role already held is idempotent, so it never trips the cap.
+     *
+     * Reads the assignments fresh (not the per-request memo) so the count
+     * reflects committed state under {@see assign()}'s lock.
      */
     private function guardRoleLimit(Model $authorizable, Role $role): void
     {
@@ -220,7 +245,7 @@ final class PermissionResolver
             return;
         }
 
-        $inScope = $this->assignedRoles($authorizable)
+        $inScope = $this->loadAssignedRoles($authorizable)
             ->reject(static fn (Role $held): bool => (bool) $held->is_system)
             ->filter(fn (Role $held): bool => $this->sameScope($held, $role));
 

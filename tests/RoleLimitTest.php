@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use Fanmade\DelegatedPermissions\DelegatedPermissions;
 use Fanmade\DelegatedPermissions\Exceptions\RoleLimitExceeded;
 use Fanmade\DelegatedPermissions\Models\Role;
+use Fanmade\DelegatedPermissions\PermissionResolver;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\Project;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -87,6 +90,30 @@ it('never counts or blocks the exempt system role', function () {
     expect(fn () => $this->user->assignRole($this->system))->not->toThrow(RoleLimitExceeded::class);
 
     expect($this->user->rolesIn($this->project)->pluck('name')->all())->toBe(['member']);
+});
+
+it('reads assignments freshly so a stale role memo cannot bypass the cap', function () {
+    config()->set('delegated-permissions.max_roles_per_scope', 1);
+
+    $resolver = app(PermissionResolver::class);
+
+    // Warm the per-request role memo while the user still holds nothing.
+    $resolver->assignedRoles($this->user);
+
+    // A first scoped role is committed out-of-band, as a concurrent request
+    // would — the warmed (empty) memo does not see it.
+    DB::table(DelegatedPermissions::table('role_assignments'))->insert([
+        'role_id' => $this->member->id,
+        'authorizable_type' => $this->user->getMorphClass(),
+        'authorizable_id' => $this->user->id,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // The scope's single slot is now full; the guard must re-read committed
+    // state and reject the second role rather than trusting the stale memo.
+    expect(fn () => $resolver->assign($this->user, $this->reviewer))
+        ->toThrow(RoleLimitExceeded::class);
 });
 
 it('treats null and a negative cap as unlimited', function () {
