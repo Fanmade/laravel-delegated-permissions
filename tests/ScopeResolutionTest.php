@@ -6,6 +6,7 @@ use Fanmade\DelegatedPermissions\Models\Permission;
 use Fanmade\DelegatedPermissions\Models\Role;
 use Fanmade\DelegatedPermissions\PermissionResolver;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\Project;
+use Fanmade\DelegatedPermissions\Tests\Fixtures\Team;
 use Fanmade\DelegatedPermissions\Tests\Fixtures\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,29 @@ it('isolates scopes — a role in project A grants nothing in project B', functi
     expect($this->resolver->permissionsForAuthorizable($this->user, $this->projectA)->sort()->values()->all())
         ->toBe(['create-tasks', 'delete-tasks', 'manage-tags'])
         ->and($this->resolver->permissionsForAuthorizable($this->user, $this->projectB))->toBeEmpty();
+});
+
+it('isolates non-integer scope keys that would collide under an integer cast', function () {
+    // Both ids cast to (int) 0, so an integer-based scope comparison treats them
+    // as one scope and leaks the grant; string comparison keeps them distinct.
+    $teamAlpha = Team::create(['id' => 'team-alpha', 'name' => 'Alpha']);
+    $teamBeta = Team::create(['id' => 'team-beta', 'name' => 'Beta']);
+
+    $ownerAlpha = Role::create([
+        'name' => 'owner',
+        'parent_id' => $this->system->id,
+        'scope_type' => $teamAlpha->getMorphClass(),
+        'scope_id' => $teamAlpha->id,
+    ]);
+    $this->resolver->grant($ownerAlpha, 'manage-tags');
+    $this->resolver->assign($this->user, $ownerAlpha);
+
+    // Resolver path (roleMatchesScope) and trait path (HasRoles::rolesIn) both
+    // confine the grant to team Alpha.
+    expect($this->resolver->authorizableHas($this->user, 'manage-tags', $teamAlpha))->toBeTrue()
+        ->and($this->resolver->authorizableHas($this->user, 'manage-tags', $teamBeta))->toBeFalse()
+        ->and($this->user->hasRole('owner', $teamAlpha))->toBeTrue()
+        ->and($this->user->hasRole('owner', $teamBeta))->toBeFalse();
 });
 
 it('lets the system role reach every scope when above-all is enabled', function () {

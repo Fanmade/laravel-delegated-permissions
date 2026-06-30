@@ -94,7 +94,7 @@ trait HasRoles
                 }
 
                 return $role->scope_type === $scope->getMorphClass()
-                    && (int) $role->scope_id === (int) $scope->getKey();
+                    && (string) $role->scope_id === (string) $scope->getKey();
             })
             ->values();
     }

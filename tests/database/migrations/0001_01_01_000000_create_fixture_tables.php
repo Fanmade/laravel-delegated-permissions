@@ -21,10 +21,17 @@ return new class extends Migration
             $table->string('name')->nullable();
             $table->timestamps();
         });
+
+        Schema::create('teams', static function (Blueprint $table): void {
+            $table->string('id')->primary();
+            $table->string('name')->nullable();
+            $table->timestamps();
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('teams');
         Schema::dropIfExists('projects');
         Schema::dropIfExists('users');
     }
