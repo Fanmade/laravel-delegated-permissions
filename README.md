@@ -1,5 +1,3 @@
-[![LaraPlugins](https://laraplugins.io/badges/plugin/fanmade/laravel-delegated-permissions.svg)](https://laraplugins.io/plugins/fanmade/laravel-delegated-permissions)
-
 # Laravel Delegated Permissions
 
 > Inheritance-based, scoped authorization for Laravel: each role delegates a
